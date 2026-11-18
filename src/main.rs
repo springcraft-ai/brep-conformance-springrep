@@ -155,7 +155,7 @@ impl Kernel for Springrep {
     }
 
     fn version(&self) -> String {
-        springrep::SOURCE.into()
+        springrep::VERSION.into()
     }
 
     fn tolerance(&self) -> f64 {
