@@ -7,8 +7,8 @@ description = "The springrep adapter for the B-rep protocol the conformance suit
 publish = false
 
 [dependencies]
-brep-protocol = { git = "https://github.com/springcraft-ai/brep-conformance", rev = "63bdc8dd8aaa7a0c889b60c890f0c0844b6380b9" }
-springrep = { git = "https://github.com/springcraft-ai/springrep", rev = "675f5f6ef78a35fbdeaf2715c2fe2b3b8a94fd23" }
+brep-protocol = "0.1"
+springrep = "0.1"
 
 [dev-dependencies]
-brep-conformance = { git = "https://github.com/springcraft-ai/brep-conformance", rev = "63bdc8dd8aaa7a0c889b60c890f0c0844b6380b9" }
+brep-conformance = { git = "https://github.com/springcraft-ai/brep-conformance", rev = "9353a5774f00e9b8dfffa3f686b19ca672068bcf" }

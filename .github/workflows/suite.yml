@@ -2,8 +2,8 @@
 name: Suite
 
 # A pull request or a push builds the adapter and runs a few tests from each area of the suite, at
-# the suite revision Cargo.toml pins. Each week, and on demand, it runs the whole suite at the
-# suite's main branch, which shows when the pin should move. Times on these shared machines are not
+# the suite commit the locked brep-protocol release was published from. Each week, and on demand,
+# it runs the whole suite at the suite's main branch, which shows when to take a newer release. Times on these shared machines are not
 # comparable; this checks that the adapter drives its kernel, and the results are only that.
 on:
   pull_request:
@@ -31,7 +31,13 @@ jobs:
         run: |
           case "$GITHUB_EVENT_NAME" in
               schedule | workflow_dispatch) ref=main ;;
-              *) ref="$(sed -n 's/^brep-protocol = .*rev = "\([0-9a-f]*\)".*/\1/p' adapter/Cargo.toml)" ;;
+              *)
+                  manifest="$(cargo metadata --locked --format-version 1 \
+                      --manifest-path adapter/Cargo.toml | jq -r '.packages[]
+                      | select(.name == "brep-protocol" and (.source // "" | startswith("registry+")))
+                      | .manifest_path')"
+                  ref="$(jq -r .git.sha1 "$(dirname "$manifest")/.cargo_vcs_info.json")"
+                  ;;
           esac
           git clone -q https://github.com/springcraft-ai/brep-conformance.git suite
           git -C suite checkout -q "$ref"
