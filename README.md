@@ -53,4 +53,4 @@ springrep's own repository.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Every commit needs a `Signed-off-by` line.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
