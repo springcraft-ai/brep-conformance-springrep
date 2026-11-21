@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::f64::consts::TAU;
 use std::process::ExitCode;
 
-use brep_protocol::{Kernel, Refusal, model, model::Primitive, profile};
+use brep_protocol::{DisplayEdge, Kernel, Refusal, model, model::Primitive, profile};
 use springrep::{
     blend, boolean, check,
     distance::{self, Selection},
@@ -29,7 +29,7 @@ fn refusal(e: springrep::Error) -> Refusal {
     match e {
         Error::InvalidInput(_) => Refusal::invalid(reason),
         Error::Unsupported(_) => Refusal::unsupported(reason),
-        Error::Numerical(_) | Error::InvalidResult(_) => Refusal::failed(reason),
+        _ => Refusal::failed(reason),
     }
 }
 
@@ -93,6 +93,7 @@ fn sketch(p: &profile::Profile) -> Result<Profile, Refusal> {
             .map_err(refusal)?,
             profile::Seg::Gn { .. } => return Err(Refusal::unsupported("a blend-section segment")),
             profile::Seg::Spline(_) => unreachable!(),
+            _ => return Err(Refusal::unsupported("a segment of an unknown kind")),
         })
     };
     // Numbered through the whole profile: a hole's faces must not share names with the outline's,
@@ -158,11 +159,80 @@ impl Kernel for Springrep {
         springrep::VERSION.into()
     }
 
+    fn supports(&self) -> Vec<String> {
+        [
+            "box",
+            "cylinder",
+            "sphere",
+            "torus",
+            "cone",
+            "extrude",
+            "revolve",
+            "screw",
+            "loft",
+            "loft_through",
+            "sweep",
+            "sweep_path",
+            "slab",
+            "union",
+            "intersection",
+            "difference",
+            "union_all",
+            "difference_all",
+            "fillet",
+            "fillet_radii",
+            "fillet_variable",
+            "fillet_conic",
+            "fillet_g2",
+            "fillet_setback",
+            "fillet_setback_g2",
+            "fillet_faces",
+            "full_round",
+            "chamfer",
+            "chamfer_two",
+            "chamfer_distances",
+            "offset",
+            "offset_faces",
+            "delete_faces",
+            "move_faces",
+            "thicken",
+            "shell",
+            "draft",
+            "write_step",
+            "sew",
+            "read_step",
+            "volume",
+            "area",
+            "classify",
+            "closest",
+            "normal",
+            "curvature",
+            "check",
+            "centroid",
+            "inertia",
+            "distance",
+            "interference",
+            "betti",
+            "section_area",
+            "section",
+            "project",
+            "bounding_box",
+            "split",
+            "mesh",
+            "display",
+            "raycast",
+            "transform",
+            "affine",
+        ]
+        .map(String::from)
+        .to_vec()
+    }
+
     fn tolerance(&self) -> f64 {
         tol::LINEAR
     }
 
-    fn make(&self, p: &Primitive) -> Result<Brep, Refusal> {
+    fn make(&mut self, p: &Primitive) -> Result<Brep, Refusal> {
         let f = p.frame();
         let e = refusal;
         match *p {
@@ -276,41 +346,35 @@ impl Kernel for Springrep {
                 let top =
                     Frame::new(v3(f.origin) + v3(f.z) * height, v3(f.z), v3(f.x)).map_err(e)?;
                 let sections = [
-                    Section {
-                        profile: sketch(profile)?,
-                        frame: base,
-                    },
-                    Section {
-                        profile: sketch(&profile.scaled(scale))?,
-                        frame: top,
-                    },
+                    Section::new(sketch(profile)?, base),
+                    Section::new(sketch(&profile.scaled(scale))?, top),
                 ];
                 loft(&sections, true, "loft").map_err(e)
             }
         }
     }
 
-    fn union(&self, a: &Brep, b: &Brep) -> Result<Brep, Refusal> {
+    fn union(&mut self, a: &Brep, b: &Brep) -> Result<Brep, Refusal> {
         boolean::union(a, b).map_err(refusal)
     }
 
-    fn intersection(&self, a: &Brep, b: &Brep) -> Result<Brep, Refusal> {
+    fn intersection(&mut self, a: &Brep, b: &Brep) -> Result<Brep, Refusal> {
         boolean::intersection(a, b).map_err(refusal)
     }
 
-    fn difference(&self, a: &Brep, b: &Brep) -> Result<Brep, Refusal> {
+    fn difference(&mut self, a: &Brep, b: &Brep) -> Result<Brep, Refusal> {
         boolean::difference(a, b).map_err(refusal)
     }
 
-    fn union_all(&self, solids: &[&Brep]) -> Result<Brep, Refusal> {
+    fn union_all(&mut self, solids: &[&Brep]) -> Result<Brep, Refusal> {
         boolean::union_all(solids).map_err(refusal)
     }
 
-    fn difference_all(&self, target: &Brep, tools: &[&Brep]) -> Result<Brep, Refusal> {
+    fn difference_all(&mut self, target: &Brep, tools: &[&Brep]) -> Result<Brep, Refusal> {
         boolean::difference_all(target, tools).map_err(refusal)
     }
 
-    fn classify(&self, s: &Brep, points: &[model::Vec3]) -> Result<Vec<model::Side>, Refusal> {
+    fn classify(&mut self, s: &Brep, points: &[model::Vec3]) -> Result<Vec<model::Side>, Refusal> {
         use springrep::rays::{Rays, Side};
         let rays = Rays::new(s).map_err(refusal)?;
         let side = |p: &model::Vec3| match rays.side(v3(*p)) {
@@ -321,7 +385,7 @@ impl Kernel for Springrep {
         Ok(points.iter().map(side).collect())
     }
 
-    fn closest(&self, s: &Brep, points: &[model::Vec3]) -> Result<Vec<model::Vec3>, Refusal> {
+    fn closest(&mut self, s: &Brep, points: &[model::Vec3]) -> Result<Vec<model::Vec3>, Refusal> {
         let nearest = distance::Nearest::solid(s).map_err(refusal)?;
         points
             .iter()
@@ -332,25 +396,25 @@ impl Kernel for Springrep {
             .collect()
     }
 
-    fn volume(&self, s: &Brep) -> Result<f64, Refusal> {
+    fn volume(&mut self, s: &Brep) -> Result<f64, Refusal> {
         Ok(measure::volume(s))
     }
 
-    fn area(&self, s: &Brep) -> Result<f64, Refusal> {
+    fn area(&mut self, s: &Brep) -> Result<f64, Refusal> {
         Ok(measure::area(s))
     }
 
-    fn check(&self, s: &Brep) -> Result<Vec<String>, Refusal> {
+    fn check(&mut self, s: &Brep) -> Result<Vec<String>, Refusal> {
         Ok(check::check(s).into_iter().map(|i| i.message).collect())
     }
 
-    fn fillet(&self, s: &Brep, edges: &[model::Vec3], radius: f64) -> Result<Brep, Refusal> {
+    fn fillet(&mut self, s: &Brep, edges: &[model::Vec3], radius: f64) -> Result<Brep, Refusal> {
         let ids = edges_at(s, edges)?;
         blend::fillet_edges(s, &ids, radius, "fil").map_err(refusal)
     }
 
     fn fillet_radii(
-        &self,
+        &mut self,
         s: &Brep,
         edges: &[model::Vec3],
         radii: &[f64],
@@ -368,7 +432,7 @@ impl Kernel for Springrep {
     }
 
     fn fillet_setback(
-        &self,
+        &mut self,
         s: &Brep,
         edges: &[model::Vec3],
         radius: f64,
@@ -379,7 +443,7 @@ impl Kernel for Springrep {
     }
 
     fn fillet_setback_g2(
-        &self,
+        &mut self,
         s: &Brep,
         edges: &[model::Vec3],
         radius: f64,
@@ -389,7 +453,7 @@ impl Kernel for Springrep {
         blend::fillet_setback_g2(s, &ids, radius, setback, "blend").map_err(refusal)
     }
 
-    fn affine(&self, s: &Brep, matrix: [[f64; 4]; 3]) -> Result<Brep, Refusal> {
+    fn affine(&mut self, s: &Brep, matrix: [[f64; 4]; 3]) -> Result<Brep, Refusal> {
         let a = edit::Affine {
             m: matrix.map(|r| [r[0], r[1], r[2]]),
             t: Vec3::new(matrix[0][3], matrix[1][3], matrix[2][3]),
@@ -398,7 +462,7 @@ impl Kernel for Springrep {
     }
 
     fn chamfer_distances(
-        &self,
+        &mut self,
         s: &Brep,
         edges: &[model::Vec3],
         distances: &[f64],
@@ -416,7 +480,7 @@ impl Kernel for Springrep {
     }
 
     fn chamfer_two(
-        &self,
+        &mut self,
         s: &Brep,
         edge: model::Vec3,
         face: model::Vec3,
@@ -427,12 +491,12 @@ impl Kernel for Springrep {
         blend::chamfer_two_edges(s, edge, face_at(s, face)?, d1, d2, "cha").map_err(refusal)
     }
 
-    fn chamfer(&self, s: &Brep, edges: &[model::Vec3], distance: f64) -> Result<Brep, Refusal> {
+    fn chamfer(&mut self, s: &Brep, edges: &[model::Vec3], distance: f64) -> Result<Brep, Refusal> {
         let ids = edges_at(s, edges)?;
         blend::chamfer_edges(s, &ids, distance, "cha").map_err(refusal)
     }
 
-    fn transform(&self, s: &Brep, m: [[f64; 4]; 3]) -> Result<Brep, Refusal> {
+    fn transform(&mut self, s: &Brep, m: [[f64; 4]; 3]) -> Result<Brep, Refusal> {
         // A uniform scale times a rotation or a mirror; a stretch or shear is refused.
         let r = [0, 1, 2].map(|i| [m[i][0], m[i][1], m[i][2]]);
         let mut out = s.clone();
@@ -441,12 +505,12 @@ impl Kernel for Springrep {
         Ok(out)
     }
 
-    fn raycast(&self, s: &Brep, o: model::Vec3, d: model::Vec3) -> Result<Vec<f64>, Refusal> {
+    fn raycast(&mut self, s: &Brep, o: model::Vec3, d: model::Vec3) -> Result<Vec<f64>, Refusal> {
         Ok(self.raycasts(s, &[(o, d)])?.remove(0))
     }
 
     fn raycasts(
-        &self,
+        &mut self,
         s: &Brep,
         rays: &[(model::Vec3, model::Vec3)],
     ) -> Result<Vec<Vec<f64>>, Refusal> {
@@ -462,48 +526,57 @@ impl Kernel for Springrep {
             .collect()
     }
 
-    fn betti(&self, s: &Brep) -> Result<[u64; 3], Refusal> {
+    fn betti(&mut self, s: &Brep) -> Result<[u64; 3], Refusal> {
         Ok(measure::betti(s))
     }
 
-    fn mesh(&self, s: &Brep, tolerance: f64) -> Result<brep_protocol::Mesh, Refusal> {
+    fn mesh(&mut self, s: &Brep, tolerance: f64) -> Result<brep_protocol::Mesh, Refusal> {
         let opt = springrep::mesh::MeshOptions::within(tolerance);
         let m = springrep::mesh::tessellate(s, &opt).map_err(refusal)?;
-        Ok(brep_protocol::Mesh {
-            positions: m.positions.iter().map(|p| [p.x, p.y, p.z]).collect(),
-            triangles: m.triangles,
-        })
+        Ok(brep_protocol::Mesh::new(
+            m.positions.iter().map(|p| [p.x, p.y, p.z]).collect(),
+            m.triangles,
+        ))
     }
 
-    fn display(&self, s: &Brep, tolerance: f64) -> Result<brep_protocol::Display, Refusal> {
+    fn display(&mut self, s: &Brep, tolerance: f64) -> Result<brep_protocol::Display, Refusal> {
         let d =
             springrep::mesh::display::display_within(s, tolerance, tolerance).map_err(refusal)?;
         let wide = |p: [f32; 3]| p.map(f64::from);
-        Ok(brep_protocol::Display {
-            faces: d
-                .faces
-                .into_iter()
-                .map(|f| brep_protocol::DisplayFace {
-                    positions: f.positions.into_iter().map(wide).collect(),
-                    normals: f.normals.into_iter().map(wide).collect(),
-                    triangles: f.triangles,
-                })
-                .collect(),
-            edges: d
-                .edges
-                .iter()
-                .map(|e| e.iter().map(|p| [p.x, p.y, p.z]).collect())
-                .collect(),
-        })
+        let faces = d
+            .faces
+            .into_iter()
+            .map(|f| {
+                brep_protocol::DisplayFace::new(
+                    f.positions.into_iter().map(wide).collect(),
+                    f.normals.into_iter().map(wide).collect(),
+                    f.triangles,
+                )
+            })
+            .collect();
+        let points = |l: Vec<Vec3>| l.iter().map(|p| [p.x, p.y, p.z]).collect();
+        let edges = d
+            .edges
+            .into_iter()
+            .zip(d.edge_faces)
+            .zip(d.edge_turns)
+            .zip(d.edge_split)
+            .map(|(((e, faces), turn), split)| {
+                let faces = faces.into_iter().map(|f| f as u32).collect();
+                DisplayEdge::new(points(e), faces, turn, split)
+            })
+            .collect();
+        let seams = d.seams.into_iter().map(points).collect();
+        Ok(brep_protocol::Display::new(faces, edges, seams))
     }
 
-    fn shell(&self, s: &Brep, open: &[model::Vec3], thickness: f64) -> Result<Brep, Refusal> {
+    fn shell(&mut self, s: &Brep, open: &[model::Vec3], thickness: f64) -> Result<Brep, Refusal> {
         let open = faces_at(s, open)?;
         edit::shell(s, &open, thickness, edit::Wall::Inward, "shell").map_err(refusal)
     }
 
     fn draft(
-        &self,
+        &mut self,
         s: &Brep,
         faces: &[model::Vec3],
         origin: model::Vec3,
@@ -524,15 +597,15 @@ impl Kernel for Springrep {
         edit::draft(s, &faces, &neutral, angle).map_err(refusal)
     }
 
-    fn write_step(&self, s: &Brep) -> Result<String, Refusal> {
+    fn write_step(&mut self, s: &Brep) -> Result<String, Refusal> {
         springrep::step::write(s, "conformance").map_err(refusal)
     }
 
-    fn read_step(&self, text: &str) -> Result<Brep, Refusal> {
+    fn read_step(&mut self, text: &str) -> Result<Brep, Refusal> {
         springrep::step::read_part(text.as_bytes(), "step").map_err(refusal)
     }
 
-    fn centroid(&self, s: &Brep) -> Result<Option<model::Vec3>, Refusal> {
+    fn centroid(&mut self, s: &Brep) -> Result<Option<model::Vec3>, Refusal> {
         if s.solid_ids().next().is_none() {
             return Ok(None);
         }
@@ -540,7 +613,7 @@ impl Kernel for Springrep {
         Ok(Some([c.x, c.y, c.z]))
     }
 
-    fn inertia(&self, s: &Brep) -> Result<[[f64; 3]; 3], Refusal> {
+    fn inertia(&mut self, s: &Brep) -> Result<[[f64; 3]; 3], Refusal> {
         if s.solid_ids().next().is_none() {
             return Ok([[0.0; 3]; 3]);
         }
@@ -548,7 +621,7 @@ impl Kernel for Springrep {
     }
 
     fn loft_through(
-        &self,
+        &mut self,
         frame: &model::Frame,
         profiles: &[profile::Profile],
         heights: &[f64],
@@ -566,17 +639,17 @@ impl Kernel for Springrep {
             .zip(heights)
             .map(|(p, &h)| {
                 let at = v3(frame.origin) + v3(frame.z) * h;
-                Ok(Section {
-                    profile: sketch(p)?,
-                    frame: Frame::new(at, v3(frame.z), v3(frame.x)).map_err(e)?,
-                })
+                Ok(Section::new(
+                    sketch(p)?,
+                    Frame::new(at, v3(frame.z), v3(frame.x)).map_err(e)?,
+                ))
             })
             .collect::<Result<Vec<_>, Refusal>>()?;
         loft(&sections, false, "loft").map_err(e)
     }
 
     fn normal(
-        &self,
+        &mut self,
         s: &Brep,
         points: &[model::Vec3],
     ) -> Result<Vec<Option<model::Vec3>>, Refusal> {
@@ -591,7 +664,7 @@ impl Kernel for Springrep {
             .collect())
     }
 
-    fn interference(&self, a: &Brep, b: &Brep) -> Result<brep_protocol::Meeting, Refusal> {
+    fn interference(&mut self, a: &Brep, b: &Brep) -> Result<brep_protocol::Meeting, Refusal> {
         let (volume, gap) = match overlap::between(a, b).map_err(refusal)? {
             overlap::Meeting::Shared(v) => (v, 0.0),
             overlap::Meeting::Touching => (0.0, 0.0),
@@ -600,22 +673,27 @@ impl Kernel for Springrep {
         Ok(brep_protocol::Meeting { volume, gap })
     }
 
-    fn offset(&self, s: &Brep, distance: f64) -> Result<Brep, Refusal> {
+    fn offset(&mut self, s: &Brep, distance: f64) -> Result<Brep, Refusal> {
         edit::offset(s, distance, "offset").map_err(refusal)
     }
 
-    fn thicken(&self, s: &Brep, faces: &[model::Vec3], thickness: f64) -> Result<Brep, Refusal> {
+    fn thicken(
+        &mut self,
+        s: &Brep,
+        faces: &[model::Vec3],
+        thickness: f64,
+    ) -> Result<Brep, Refusal> {
         let faces = faces_at(s, faces)?;
         edit::thicken(s, &faces, thickness).map_err(refusal)
     }
 
-    fn delete_faces(&self, s: &Brep, faces: &[model::Vec3]) -> Result<Brep, Refusal> {
+    fn delete_faces(&mut self, s: &Brep, faces: &[model::Vec3]) -> Result<Brep, Refusal> {
         let faces = faces_at(s, faces)?;
         edit::delete_faces(s, &faces).map_err(refusal)
     }
 
     fn offset_faces(
-        &self,
+        &mut self,
         s: &Brep,
         faces: &[model::Vec3],
         distance: f64,
@@ -628,7 +706,7 @@ impl Kernel for Springrep {
     }
 
     fn move_faces(
-        &self,
+        &mut self,
         s: &Brep,
         faces: &[model::Vec3],
         matrix: [[f64; 4]; 3],
@@ -643,7 +721,7 @@ impl Kernel for Springrep {
     }
 
     fn split(
-        &self,
+        &mut self,
         s: &Brep,
         origin: model::Vec3,
         normal: model::Vec3,
@@ -652,7 +730,7 @@ impl Kernel for Springrep {
     }
 
     fn section(
-        &self,
+        &mut self,
         s: &Brep,
         origin: model::Vec3,
         normal: model::Vec3,
@@ -667,7 +745,7 @@ impl Kernel for Springrep {
     }
 
     fn section_area(
-        &self,
+        &mut self,
         s: &Brep,
         origin: model::Vec3,
         normal: model::Vec3,
@@ -676,7 +754,7 @@ impl Kernel for Springrep {
     }
 
     fn fillet_g2(
-        &self,
+        &mut self,
         s: &Brep,
         edges: &[model::Vec3],
         offset: f64,
@@ -687,7 +765,7 @@ impl Kernel for Springrep {
     }
 
     fn fillet_variable(
-        &self,
+        &mut self,
         s: &Brep,
         edge: model::Vec3,
         from: model::Vec3,
@@ -699,7 +777,7 @@ impl Kernel for Springrep {
     }
 
     fn fillet_conic(
-        &self,
+        &mut self,
         s: &Brep,
         edges: &[model::Vec3],
         setback: f64,
@@ -710,7 +788,7 @@ impl Kernel for Springrep {
     }
 
     fn fillet_faces(
-        &self,
+        &mut self,
         s: &Brep,
         face_a: model::Vec3,
         face_b: model::Vec3,
@@ -721,7 +799,7 @@ impl Kernel for Springrep {
     }
 
     fn full_round(
-        &self,
+        &mut self,
         s: &Brep,
         side_a: model::Vec3,
         middle: model::Vec3,
@@ -736,7 +814,7 @@ impl Kernel for Springrep {
     }
 
     fn project(
-        &self,
+        &mut self,
         s: &Brep,
         direction: model::Vec3,
         tolerance: f64,
@@ -750,14 +828,14 @@ impl Kernel for Springrep {
                 .map(|l| l.iter().map(|p| [p.dot(u), p.dot(v)]).collect())
                 .collect()
         };
-        Ok(brep_protocol::Projection {
-            visible: flat(drawn.visible),
-            hidden: flat(drawn.hidden),
-        })
+        Ok(brep_protocol::Projection::new(
+            flat(drawn.visible),
+            flat(drawn.hidden),
+        ))
     }
 
     fn curvature(
-        &self,
+        &mut self,
         s: &Brep,
         points: &[model::Vec3],
     ) -> Result<Vec<Option<[f64; 2]>>, Refusal> {
@@ -765,16 +843,16 @@ impl Kernel for Springrep {
         Ok(points.iter().map(|&p| outlines.curvature(v3(p))).collect())
     }
 
-    fn sew(&self, text: &str, tolerance: f64) -> Result<Brep, Refusal> {
+    fn sew(&mut self, text: &str, tolerance: f64) -> Result<Brep, Refusal> {
         springrep::step::sew(text.as_bytes(), tolerance).map_err(refusal)
     }
 
-    fn bounding_box(&self, s: &Brep) -> Result<[model::Vec3; 2], Refusal> {
+    fn bounding_box(&mut self, s: &Brep) -> Result<[model::Vec3; 2], Refusal> {
         let b = measure::bbox(s);
         Ok([b.min.to_array(), b.max.to_array()])
     }
 
-    fn distance(&self, a: &Brep, b: &Brep) -> Result<f64, Refusal> {
+    fn distance(&mut self, a: &Brep, b: &Brep) -> Result<f64, Refusal> {
         distance::closest(a, &Selection::body(a), b, &Selection::body(b))
             .map(|c| c.distance)
             .map_err(refusal)
@@ -782,7 +860,7 @@ impl Kernel for Springrep {
 }
 
 fn main() -> ExitCode {
-    match brep_protocol::serve(&Springrep) {
+    match brep_protocol::serve(&mut Springrep) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{e}");
@@ -798,7 +876,7 @@ mod tests {
 
     /// The `ASSET_GENERATOR` the published shapes were drawn under, and the fingerprint of what
     /// springrep's `display` drew then.
-    const DRAWN_UNDER: (&str, u64) = ("4", 0x62ae86b57aef1ddc);
+    const DRAWN_UNDER: (&str, u64) = ("9", 0x0343aed8e5a55af7);
 
     fn fnv(h: &mut u64, x: i64) {
         for b in x.to_le_bytes() {
@@ -845,8 +923,9 @@ mod tests {
         }
         fnv(h, d.edges.len() as i64);
         for e in &d.edges {
-            fnv(h, e.len() as i64);
+            fnv(h, e.points.len() as i64);
             let length: f64 = e
+                .points
                 .windows(2)
                 .map(|w| {
                     (0..3)
@@ -861,9 +940,9 @@ mod tests {
 
     #[test]
     fn the_published_shapes_are_still_what_display_draws() {
-        let k = Springrep;
+        let mut k = Springrep;
         let at = model::Frame::at([1.0, 2.0, 3.0]);
-        let make = |p: Primitive| k.make(&p).unwrap();
+        let mut make = |p: Primitive| k.make(&p).unwrap();
         let block = make(Primitive::Box {
             frame: at,
             size: [10.0, 20.0, 30.0],
