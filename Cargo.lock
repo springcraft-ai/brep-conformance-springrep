@@ -5,17 +5,17 @@ version = 4
 [[package]]
 name = "brep-conformance"
 version = "2.0.0"
-source = "git+https://github.com/springcraft-ai/brep-conformance?rev=0bc86ad7f36f3993d82748573a49584cf96d0870#0bc86ad7f36f3993d82748573a49584cf96d0870"
+source = "git+https://github.com/springcraft-ai/brep-conformance?rev=49d279a92e52e384a6638ef69c73edea20300774#49d279a92e52e384a6638ef69c73edea20300774"
 dependencies = [
- "brep-protocol 2.0.0 (git+https://github.com/springcraft-ai/brep-conformance?rev=0bc86ad7f36f3993d82748573a49584cf96d0870)",
+ "brep-protocol 2.0.1 (git+https://github.com/springcraft-ai/brep-conformance?rev=49d279a92e52e384a6638ef69c73edea20300774)",
  "serde_json",
 ]
 
 [[package]]
 name = "brep-protocol"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3986d289c9c68c93b6f978e66da7f6530598db1c10898d67b0d3248ef9099c52"
+checksum = "bc69a0ca36f027705416d616c3b6bbc6869359c661cd9ca388bfb28c074b5b78"
 dependencies = [
  "libc",
  "libm",
@@ -24,8 +24,8 @@ dependencies = [
 
 [[package]]
 name = "brep-protocol"
-version = "2.0.0"
-source = "git+https://github.com/springcraft-ai/brep-conformance?rev=0bc86ad7f36f3993d82748573a49584cf96d0870#0bc86ad7f36f3993d82748573a49584cf96d0870"
+version = "2.0.1"
+source = "git+https://github.com/springcraft-ai/brep-conformance?rev=49d279a92e52e384a6638ef69c73edea20300774#49d279a92e52e384a6638ef69c73edea20300774"
 dependencies = [
  "libc",
  "libm",
@@ -127,7 +127,7 @@ name = "springrep-adapter"
 version = "0.1.0"
 dependencies = [
  "brep-conformance",
- "brep-protocol 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "brep-protocol 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "springrep",
 ]
 
