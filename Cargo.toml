@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 brep-protocol = "2"
-springrep = "2"
+springrep = "=2.1.0"
 
 [dev-dependencies]
 brep-conformance = { git = "https://github.com/springcraft-ai/brep-conformance", rev = "49d279a92e52e384a6638ef69c73edea20300774" }
