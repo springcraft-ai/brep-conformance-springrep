@@ -118,9 +118,9 @@ dependencies = [
 
 [[package]]
 name = "springrep"
-version = "2.0.0"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6de87778ed69bd2bbd52d71810469bb92ee1014ce2197553c84bf9547f79421"
+checksum = "39bf794647f9bb3471416b8bb2c8541959e6425758e72283416e13d303e1d7dd"
 
 [[package]]
 name = "springrep-adapter"
