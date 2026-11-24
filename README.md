@@ -48,8 +48,12 @@ target/release/brep-conformance --adapter ../brep-conformance-springrep/target/r
 
 ## Licences
 
-The adapter and springrep are both under the MIT licence: see [LICENSE](LICENSE) here and
-springrep's own repository.
+The adapter in this repository is under either the MIT licence
+([LICENSE-MIT](LICENSE-MIT)) or the Apache License, Version 2.0
+([LICENSE-APACHE](LICENSE-APACHE)), at your option.
+
+springrep is a separate work under its own licence; its repository is the authority on
+that.
 
 ## Contributing
 
