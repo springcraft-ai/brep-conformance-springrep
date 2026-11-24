@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: MIT OR Apache-2.0
 name: Suite
 
 # A pull request or a push builds the adapter and runs a few tests from each area of the suite, at

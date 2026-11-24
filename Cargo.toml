@@ -2,7 +2,7 @@
 name = "springrep-adapter"
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 description = "The springrep adapter for the B-rep protocol the conformance suite drives"
 publish = false
 
